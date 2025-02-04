@@ -33,13 +33,24 @@ No installation required—just open the link and start exploring.
 ### 💻 Run Locally
 
 To run the simulator on your own machine, follow these steps:
+Install R (if not already installed) from [CRAN](https://cran.r-project.org/).
 
-1. Install R (if not already installed) from [CRAN](https://cran.r-project.org/).
-2. Install required R packages:
-   ```r
-   install.packages(c("shiny", "ggplot2", "dplyr", "survival"))
-3. Clone this repository: git clone https://github.com/XintongEllaLu/SWCRTsimulator.git
-cd SWCRTsimulator
-4. Run the Shiny app in R：
-   library(shiny)
-   runApp("app.R")
+#### ✅ Option 1: Clone the repository
+```bash
+git clone https://github.com/XintongEllaLu/SWCRTsimulator.git
+cd SWCRTsimulator/RShiny_Apps
+```
+#### ✅ Option 2: Download manually  
+1. Go to **[SWCRTsimulator app.R](https://github.com/XintongEllaLu/SWCRTsimulator/blob/main/Rshiny%20Apps/app.R)**  
+2. Click **"Code" → "Download"**  
+
+#### 🚀 Run the App  
+After obtaining the files, install the required R packages and launch the app:
+
+```r
+# Install required R packages
+install.packages(c("shiny", "ggplot2", "dplyr", "survival"))
+
+# Run the Shiny app
+library(shiny)
+runApp("app.R")
