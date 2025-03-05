@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+
 # Load necessary libraries
 library(shiny)
 library(dplyr)
@@ -17,7 +18,7 @@ library(survival)
 library(lme4)
 library(GLMMadaptive)
 library(ggplot2)
-
+library(faux) 
 library(bslib)
 library(DT)
 
@@ -85,20 +86,20 @@ ui<-page_navbar(
   
   title="Stepped Wedge Design Simulation",
   
-  sidebar=sidebar(
-    width=350,
-    open=NA,
+  sidebar = sidebar(
+    width = 360,
+    open = NA,
     
     actionButton("runSim", "Run Simulation", icon = icon("play")),
     
-    
     accordion(
-      open=c('Model Selection','Beta Coefficients'),
+      open = c('Model Selection', 'Beta Coefficients'),
+      
       accordion_panel(
         'Model Selection',
-        radioButtons("model_choice",NULL, choices = c("glimmix", "glmmadaptive")),
+        radioButtons("model_choice", NULL, choices = c("glimmix", "glmmadaptive")),
         numericInput("significantvalue", "Significant Level", value = 0.05, min = 0.01),
-        numericInput("sim_num", "Number of Simulations", value = 3, min = 1),
+        numericInput("sim_num", "Number of Simulations", value = 3, min = 1)
       ),
       
       accordion_panel(
@@ -107,43 +108,48 @@ ui<-page_navbar(
         selectInput("num_vars", "Number of Covariates", choices = c(1, 2, 3)),
         uiOutput('bcv3')
       ),
+      
       accordion_panel(
         'Sample Size and Cluster Information',
         numericInput("steps", "Steps", value = 4, min = 1),
-        numericInput("clusters_per_step","Clusters per Step", value = 1, min = 1),
+        numericInput("clusters_per_step", "Clusters per Step", value = 1, min = 1),
         numericInput("samplesize", "Cluster Sample Size", value = 200, min = 1, step = 50)
       ),
+      
       accordion_panel(
         'Interval and Switch Parameters',
         numericInput("intv_length", "Interval Length (days)", value = 30, min = 1),
-        numericInput("switch_interval", "Switch Interval (days)", value = 180, min = 1),
+        numericInput("switch_interval", "Switch Interval (days)", value = 180, min = 1)
       ),
+      
       accordion_panel(
         'Time Parameters',
         dateRangeInput("study_time", "Study Time Range", 
                        start = "2021-09-01", end = "2025-02-28"),
         dateInput("switch_begin", "Switch Begin Time", value = "2022-02-28"),
         dateInput("recruit_end", "Recruitment End Time", value = "2024-02-28"),
-        numericInput("followup_length", "Follow-up Length (days)", value = 365, min = 0),
-      ),
-      accordion_panel(
-        'Distribution Parameters',
-        numericInput("scale", "Scale", value = 0.003),
-        numericInput("shape", "Shape", value = 0.441),
+        numericInput("followup_length", "Follow-up Length (days)", value = 365, min = 0)
       ),
       
       accordion_panel(
-        'Standard Errors',
-        numericInput("sigma_c", "Standard Deviation for Cluster ", value = 0.3, min = 0),
-        # Conditional input for sigma_tau, only show if glmmadaptive is selected
+        'Random Effects',
+        numericInput("sigma_c", "Standard Deviation for Cluster", value = 0.3, min = 0),
+        
+        # Conditional input for sigma_tau, only shown if glmmadaptive is selected
         conditionalPanel(
           condition = "input.model_choice == 'glmmadaptive'",
-          numericInput("sigma_tau", "Standard Deviation for Treatment within Cluster", value = 0.15, min = 0)
-        ),
+          numericInput("sigma_tau", "Standard Deviation for Treatment within Cluster", value = 0.15, min = 0),
+          numericInput("rho", "Correlation", value = 0.2)
+        )
       ),
-    ),
-    
-  ), ####end sidebar
+      
+      accordion_panel(
+        'Weibull Parameters',  # Moved this to the last position
+        numericInput("scale", "Scale", value = 0.003),
+        numericInput("shape", "Shape", value = 0.441)
+      ),
+    ), # End accordion
+  ), # End sidebar
   
   nav_panel(
     "User Guide",
@@ -211,11 +217,12 @@ ui<-page_navbar(
             tags$tr(tags$td("Switch Begin Time"), tags$td("The time when the first cluster switches from control to intervention.")),
             tags$tr(tags$td("Recruitment End Time"), tags$td("Time point after which no new participants are recruited.")),
             tags$tr(tags$td("Follow-up Time"), tags$td("The duration of time each individual is followed after entry into the study.")),
-            tags$tr(tags$td("Treatment Effect"), tags$td("The treatment effect is presented in exponentiated form, as the clog-log link function are used.")),
+            tags$tr(tags$td("Treatment Effect"), tags$td("The treatment effect is presented in log-hazad scale, as the clog-log link function are used.")),
             tags$tr(tags$td("Time-independent Covariates"), tags$td("Coefficients and Distributions for time-independent covariates such as age and gender.")),
             tags$tr(tags$td("Significance Level"), tags$td("The threshold for statistical significance.")),
-            tags$tr(tags$td("Standard Deviation for ", withMathJax("\\(\\tau_{m\\phi}\\)")), tags$td("The variance of the random effect for treatment within each cluster.")),
-            tags$tr(tags$td("Standard Deviation for ", withMathJax("\\(\\tau_{m}\\)")), tags$td("The variance of the random effect for each cluster.")),
+            tags$tr(tags$td("Random Effect ", withMathJax("\\(\\tau_{m\\phi}\\)")), tags$td("The standard deviation of the random effect for treatment within each cluster.")),
+            tags$tr(tags$td("Random Effect ", withMathJax("\\(\\tau_{m}\\)")), tags$td("The standard deviation of the random effect for each cluster.")),
+            tags$tr(tags$td("Correlation"), tags$td("Correlation between the cluster-level random effect and the treatment effect within a cluster.")),
             tags$tr(tags$td("Scale Parameter "), tags$td("Scale parameter for the Weibull distribution.")),
             tags$tr(tags$td("Shape Parameter"), tags$td("Shape parameter for the Weibull distribution."))
           )
@@ -235,7 +242,7 @@ ui<-page_navbar(
       tags$ul(
         tags$li(strong("Simulation Data:"), " Downloadable data generated by the simulation."),
         tags$li(strong("Density Plot:"), " A plot for visualizing event occurrences in the data."),
-        tags$li(strong("Mean Treatment Effect and Power:"), " Displays the estimated power and the mean beta of the treatment effect for your study."),
+        tags$li(strong("Estimated Treatment Effect and Power:"), " Displays the estimated power and the mean beta of the treatment effect for your study."),
         tags$li(strong("Histogram:"), " A histogram of the beta values of treatment effect to observe their distribution.")
       ),
       
@@ -279,13 +286,13 @@ ui<-page_navbar(
             )
   ),
   
-  nav_panel("Mean Treatment Effect and Power",
+  nav_panel("Estimated Treatment Effect and Power",
             # UI container with a card-like style for mean beta and power results
             div(
               style = "background-color: #f8f9fa; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); margin-bottom: 20px;",
               
               # Title
-              tags$h3("Mean Beta and Power", style = "color: #2C3E50; font-weight: bold; text-align: center; margin-bottom: 20px;"),
+              tags$h3("Estimated Treatment Effect and Power", style = "color: #2C3E50; font-weight: bold; text-align: center; margin-bottom: 20px;"),
               
               # UI output for simulation results (Mean Beta and Power)
               uiOutput("simulationResults"),
@@ -382,7 +389,6 @@ server <- function(input, output, session) {
     }
     
     
-    
     # Progress tracking
     start.sim_time <- Sys.time()
     
@@ -396,8 +402,20 @@ server <- function(input, output, session) {
         # Determine the step for this cluster
         step <- cluster_steps[cluster]
         
-        error <- rnorm(1, mean = 0, sd = input$sigma_c)
-        tau_bti <- if (input$model_choice == "glmmadaptive") rnorm(1, mean = 0, sd = input$sigma_tau) else 0
+        if (input$model_choice == "glmmadaptive") {
+          # Generate correlated error and tau_bti
+          c_values <- rnorm_multi(n = 1, vars = 2, mu = c(0, 0), 
+                                  sd = c(input$sigma_c, input$sigma_tau), 
+                                  r = input$rho, empirical = FALSE)
+          
+          error <- c_values$X1
+          tau_bti <- c_values$X2
+        } else {
+          # Generate only error, set tau_bti to 0
+          error <- rnorm(1, mean = 0, sd = input$sigma_c)
+          tau_bti <- 0
+        }
+        
         
         for (id in 1:input$samplesize) {
           # Generate variables based on the number of variables selected by the user
@@ -694,7 +712,7 @@ server <- function(input, output, session) {
     output$simulationResults <- renderUI({
       tagList(
         tags$h6("Simulation Results:"),
-        tags$p("Mean of Beta Coefficients:",tags$em(mean_beta)),
+        tags$p("Mean of Treatment Coefficients:",tags$em(mean_beta)),
         tags$p("Estimated Power:",tags$em(power)),
       )
     })
@@ -708,8 +726,8 @@ server <- function(input, output, session) {
         geom_histogram(binwidth = 0.1, fill = "blue", color = "black", alpha = 0.7) +
         geom_vline(aes(xintercept = mean_beta), color = "red", linetype = "dashed", size = 1) +
         labs(
-          title = paste("Histogram of Treatment Effect Coefficients (Beta =", input$beta, ")"),
-          x = "Beta (Treatment Effect)",
+          title = paste("Histogram of Treatment Effect Coefficients (True Treatment Effect  =", input$beta, ")"),
+          x = "Estimated Treatment Effect (Red line = Mean)",
           y = "Frequency"
         ) +
         theme_minimal()
@@ -753,4 +771,5 @@ server <- function(input, output, session) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
+
 ```
