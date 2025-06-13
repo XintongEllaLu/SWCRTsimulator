@@ -10,6 +10,14 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    https://shiny.posit.co/
+#
 
 # Load necessary libraries
 library(shiny)
@@ -93,17 +101,17 @@ ui<-page_navbar(
     actionButton("runSim", "Run Simulation", icon = icon("play")),
     
     accordion(
-      open = c('Model Selection', 'Beta Coefficients'),
+      open = c('Model Selection', 'Regression Coefficients'),
       
       accordion_panel(
         'Model Selection',
         radioButtons("model_choice", NULL, choices = c("glimmix", "glmmadaptive")),
         numericInput("significantvalue", "Significant Level", value = 0.05, min = 0.01),
-        numericInput("sim_num", "Number of Simulations", value = 3, min = 1)
+        numericInput("sim_num", "Number of Simulations", value = 30, min = 1)
       ),
       
       accordion_panel(
-        'Beta Coefficients',
+        'Regression Coefficients',
         numericInput("beta", "Treatment Effect", value = 1.5),
         selectInput("num_vars", "Number of Covariates", choices = c(1, 2, 3)),
         uiOutput('bcv3')
@@ -112,13 +120,13 @@ ui<-page_navbar(
       accordion_panel(
         'Sample Size and Cluster Information',
         numericInput("steps", "Steps", value = 4, min = 1),
-        numericInput("clusters_per_step", "Clusters per Step", value = 1, min = 1),
-        numericInput("samplesize", "Cluster Sample Size", value = 200, min = 1, step = 50)
+        numericInput("clusters_per_step", "Clusters per Step", value = 3, min = 1),
+        numericInput("samplesize", "Cluster Sample Size", value = 59, min = 1, step = 50)
       ),
       
       accordion_panel(
         'Interval and Switch Parameters',
-        numericInput("intv_length", "Interval Length (days)", value = 30, min = 1),
+        numericInput("intv_length", "Interval Length (days)", value = 90, min = 1),
         numericInput("switch_interval", "Switch Interval (days)", value = 180, min = 1)
       ),
       
@@ -162,7 +170,7 @@ ui<-page_navbar(
       
       # Introduction paragraph
       tags$p(
-        "This platform assists researchers and statisticians in conducting power and sample size calculations for stepped wedge cluster randomized trials (SWCRT) under various experimental conditions. Utilizing Monte Carlo simulations, the platform allows users to explore the influence of key parameters on the study’s power and outcomes. By simulating thousands of trial iterations, the platform provides robust estimates of power, enabling users to optimize trial design and evaluate statistical performance under realistic scenarios. Through an intuitive interface, users can easily manipulate input parameters and visualize the impact on study outcomes.",
+        "This platform assists researchers and statisticians in conducting statistical power and sample size estimation for a stepped wedge cluster randomized trial (SWCRT) involving an interval-censored time-to-event outcome under various experimental conditions. Utilizing Monte Carlo simulations, the platform allows users to explore the influence of key study design features and model parameters on the study’s statistical power. By varying the inputs for sample size, researchers can also iteratively choose an optimal sample size for the desired study design and level of statistical power. Through an intuitive interface, users can easily manipulate input parameters and visualize the impact on statistical performance under realistic scenarios.",
         style = "color: #34495E; font-size: 16px; text-align: left; padding-bottom: 20px;"
       ),
       
@@ -177,7 +185,7 @@ ui<-page_navbar(
       
       # Model selection explanation
       tags$h4("Model Selection", style = "color: #2980B9; font-weight: bold;"),
-      tags$p("The app provides two model choices:", style = "color: #34495E;"),
+      tags$p("The platform provides two model choices:", style = "color: #34495E;"),
       tags$ul(
         tags$li(
           strong("Glimmix:"), 
@@ -188,7 +196,7 @@ ui<-page_navbar(
           " Uses the ", tags$code("mixed_model()"), " function from the ", tags$code("GLMMadaptive"), " package, which models both treatment and cluster-level random effects."
         )
       ),
-      tags$p("Choose the appropriate model based on your experimental design.", style = "color: #34495E;"),
+      tags$p("Choose the appropriate model based on your experimental design. The ", tags$code("GLMMadaptive"), "model should be selected if your design includes both cluster- and treatment-level random effects, which can be correlated.", style = "color: #34495E;"),
       
       # Setting up parameters
       tags$h4("Setting Up Parameters", style = "color: #2980B9; font-weight: bold;"),
@@ -223,11 +231,77 @@ ui<-page_navbar(
             tags$tr(tags$td("Random Effect ", withMathJax("\\(\\tau_{m\\phi}\\)")), tags$td("The standard deviation of the random effect for treatment within each cluster.")),
             tags$tr(tags$td("Random Effect ", withMathJax("\\(\\tau_{m}\\)")), tags$td("The standard deviation of the random effect for each cluster.")),
             tags$tr(tags$td("Correlation"), tags$td("Correlation between the cluster-level random effect and the treatment effect within a cluster.")),
-            tags$tr(tags$td("Scale Parameter "), tags$td("Scale parameter for the Weibull distribution.")),
+            tags$tr(tags$td("Scale Parameter "), tags$td("Scale parameter for the Weibull distribution. ")),
             tags$tr(tags$td("Shape Parameter"), tags$td("Shape parameter for the Weibull distribution."))
           )
         )
       ),
+      
+      tags$div(
+        style = "border: 1.5px solid #D6EAF8; border-radius: 10px; padding: 25px; background-color: #FAFBFC; margin-top: 20px; font-family: 'Segoe UI', sans-serif;",
+        
+        # Title
+        tags$h4("Back-of-the-Napkin Calculation for Weibull Parameters", 
+                style = "color: #21618C; font-weight: 600; font-size: 18px; margin-bottom: 12px;"),
+        
+        # Intro text
+        tags$p(
+          HTML("To estimate the shape and scale parameters, use the following formulas<sup>[1,2]</sup>:"),
+          style = "color: #2C3E50; font-size: 17px; font-family: 'Georgia', serif; margin-bottom: 8px;"
+        ),
+        
+        
+        # Formula block with inline equations and explanations
+        tags$div(
+          style = "
+    background-color: #F4F6F7;
+    padding: 20px 16px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 80px;",  
+          tags$ul(
+            style = "color: #2C3E50; font-size: 15px; font-family: 'Georgia', serif; margin: 0;",
+            
+            tags$li(
+              withMathJax(
+                "\\( \\textbf{Shape}: \\nu = 1.2785 \\times \\left( \\frac{M}{SD} \\right) - 0.5004, \\text{ where } M \\text{ is the average of event times, } SD \\text{ is the standard deviation.} \\)"
+              )
+            ),
+            tags$li(
+              withMathJax(
+                "\\( \\textbf{Scale}: \\lambda = \\frac{M}{\\Gamma(1 - 1/\\nu)}, \\text{ where } \\Gamma(x) \\text{ is the gamma function evaluated at } x = 1 - 1/\\nu. \\)"
+              )
+            )
+          )
+        ),
+        
+        tags$div(
+          style = "font-size: 13px; font-family: 'Georgia', serif; color: #566573; margin-top: 12px;",
+          
+          tags$p(HTML("<strong>References</strong>"), 
+                 style = "margin-bottom: 4px;"),
+          
+          tags$ol(
+            style = "padding-left: 20px; margin-top: 2px; margin-bottom: 0px;",
+            
+            tags$li(style = "margin-bottom: 4px;", HTML(
+              "Tiryakioḡlu, M. (2017). <em>Can anybody explain how to find out the shape and scale parameters for Weibull statistics for average wind speed data for a month?</em> Retrieved from <a href='https://www.researchgate.net/post/Can-anybody-explain-how-to-find-out-the-shape-and-scale-parameters-for-weibull-statistics-for-average-wind-speed-data-for-a-month' target='_blank'>ResearchGate</a>."
+            )),
+            
+            tags$li(style = "margin-bottom: 0px;", HTML(
+              "Garcia, R. (1981). Estimating Weibull parameters from summary statistics. <em>New Zealand Journal of Forestry Science, 11</em>(3), 304–306."
+            ))
+          )
+        )
+        
+        
+      ),
+      
+      
+      tags$div(style = "height: 20px;"),
+      
       
       # Running the simulation
       tags$h4("Running the Simulation", style = "color: #2980B9; font-weight: bold;"),
@@ -242,8 +316,8 @@ ui<-page_navbar(
       tags$ul(
         tags$li(strong("Simulation Data:"), " Downloadable data generated by the simulation."),
         tags$li(strong("Density Plot:"), " A plot for visualizing event occurrences in the data."),
-        tags$li(strong("Estimated Treatment Effect and Power:"), " Displays the estimated power and the mean beta of the treatment effect for your study."),
-        tags$li(strong("Histogram:"), " A histogram of the beta values of treatment effect to observe their distribution.")
+        tags$li(strong("Estimated Treatment Effect and Power:"), " Displays the estimated power and the mean coefficients of the treatment effect for your study."),
+        tags$li(strong("Histogram:"), " A histogram of the coefficients of treatment effect to observe their distribution.")
       ),
       
       # Notes
@@ -254,6 +328,10 @@ ui<-page_navbar(
       )
     )
   ),
+  
+ 
+  
+  
   
   nav_panel("Simulation Data",
             # UI container with a card-like style for simulation data
@@ -294,7 +372,7 @@ ui<-page_navbar(
               # Title
               tags$h3("Estimated Treatment Effect and Power", style = "color: #2C3E50; font-weight: bold; text-align: center; margin-bottom: 20px;"),
               
-              # UI output for simulation results (Mean Beta and Power)
+              # UI output for simulation results 
               uiOutput("simulationResults"),
               
               # Checkbox to show or hide the histogram, with inline styling applied to the surrounding div
@@ -322,6 +400,38 @@ ui<-page_navbar(
 # Begain Simulation
 server <- function(input, output, session) {
   
+  
+  warning_store <- reactiveValues(messages = character())
+  
+  
+  showWarningsModal <- function(messages) {
+    if (length(messages) > 0) {
+      showModal(modalDialog(
+        title = "⚠️ Warnings",
+        tagList(
+          lapply(messages, function(msg) {
+            tags$p(style = "color: #c0392b;", paste("-", msg))
+          })
+        ),
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      ))
+    }
+  }
+  
+  showErrorModal <- function(message) {
+    showModal(modalDialog(
+      title = "❌ Error",
+      div(
+        style = "color: #e74c3c;",
+        p(message),
+        p("Please check your inputs. Extreme shape/scale values may cause modeling failure.")
+      ),
+      easyClose = TRUE,
+      footer = modalButton("Close")
+    ))
+  }
+  
  
   output$bcv3<-renderUI({
     input$num_vars->nv
@@ -330,7 +440,7 @@ server <- function(input, output, session) {
     {
       tagList(
         selectInput(paste0("var",xx,"_type"), paste("Covariate",xx,"Type"), choices = c("Continuous", "Binary")),
-        numericInput(paste0("beta",xx),paste0("Beta for Covariate ",xx), value = 0.5),
+        numericInput(paste0("beta",xx),paste0("Coefficients for Covariate ",xx), value = 0.5),
         uiOutput(paste0('bcvv',xx))
       )
     }
@@ -367,6 +477,7 @@ server <- function(input, output, session) {
   
   ########
   observeEvent(input$runSim, {
+      tryCatch({
     set.seed(123)
     
     
@@ -649,6 +760,8 @@ server <- function(input, output, session) {
                                    paste(c(variable_names, "trt", "interval"), collapse = " + ")))
       
       if (input$model_choice == "glimmix") {
+        
+        withCallingHandlers({
         # Fit the glimmix model
         glimmix_model <- glmer(formula, 
                                data = eventhistorydata %>% filter(sim == !!sim), 
@@ -657,7 +770,15 @@ server <- function(input, output, session) {
         betas[sim] <- fixef(glimmix_model)["trt"]
         pvalues[sim] <- summary(glimmix_model)$coefficients["trt", "Pr(>|z|)"]
         
+        }, warning = function(w) {
+          warning_store$messages <- c(warning_store$messages, conditionMessage(w))
+          invokeRestart("muffleWarning")
+        })
+        
+        
       } else if (input$model_choice == "glmmadaptive") {
+        
+        withCallingHandlers({
         # Fit the glmmadaptive model
         glmmadaptive_model <- mixed_model(
           fixed = formula2, 
@@ -673,9 +794,20 @@ server <- function(input, output, session) {
         p_value_trt <- coefficients_table["trt", "p-value"] 
         
         pvalues[sim] <- p_value_trt
-      }
+      }, warning = function(w) {
+        warning_store$messages <- c(warning_store$messages, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      })
       
+      }
+      isolate({
+        if (length(warning_store$messages) > 0) {
+          showWarningsModal(unique(warning_store$messages))
+          warning_store$messages <- character()  # Reset after displaying
         }
+      })
+      
+    }
     
     # Close the progress bar after all simulations are complete
     progress3$close()
@@ -756,6 +888,10 @@ server <- function(input, output, session) {
       nocols<-''
       colss<-setdiff(names(results),nocols)
       datatable(results[,colss],options=list(dom='tp'))
+    })
+      }, error = function(e) {
+        showErrorModal(conditionMessage(e))
+        
     })
     
     
